@@ -67,4 +67,66 @@ router.post("/ejercicios", async (req, res) => {
     }
   );
 });
+
+//Editar ejercicio
+router.put("/ejercicios/:id_ejercicio", async (req, res) => {
+  try {
+    const id = req.params.id_ejercicio;
+    const { nombre_ejercicio, series, repeticiones, id_cliente } = req.body;
+
+    // Actualizamos los datos del ejercicio
+    const { rows: ejerciciosRows } = await pool.query(
+      "UPDATE ejercicio SET nombre_ejercicio = $1, series = $2, repeticiones = $3 WHERE id_ejercicio = $4 RETURNING *",
+      [nombre_ejercicio, series, repeticiones, id]
+    );
+
+    if (!ejerciciosRows[0]) {
+      return res.status(404).json({ mensaje: "Ejercicio no encontrado" });
+    }
+
+    // Eliminamos todas las relaciones existentes con los clientes
+    await pool.query("DELETE FROM cliente_ejercicio WHERE id_ejercicio = $1", [
+      id,
+    ]);
+
+    // Insertamos las nuevas relaciones con los clientes
+    await pool.query(
+      "INSERT INTO cliente_ejercicio (id_cliente, id_ejercicio) VALUES ($1, $2)",
+      [id_cliente, id]
+    );
+
+    res.status(200).json(ejerciciosRows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ mensaje: "Error interno del servidor" });
+  }
+});
+
+//borrar ejercicio
+router.delete("/borrar-ejercicios/:id_ejercicio", async (req, res) => {
+  try {
+    const id = req.params.id_ejercicio;
+
+    // Eliminamos todas las relaciones existentes con los clientes
+    await pool.query("DELETE FROM cliente_ejercicio WHERE id_ejercicio = $1", [
+      id,
+    ]);
+
+    // Eliminamos el ejercicio de la base de datos
+    const { rows: ejerciciosRows } = await pool.query(
+      "DELETE FROM ejercicio WHERE id_ejercicio = $1 RETURNING *",
+      [id]
+    );
+
+    if (!ejerciciosRows[0]) {
+      return res.status(404).json({ mensaje: "Ejercicio no encontrado" });
+    }
+
+    res.status(200).json({ mensaje: "Ejercicio eliminado correctamente" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ mensaje: "Error interno del servidor" });
+  }
+});
+
 module.exports = router;
