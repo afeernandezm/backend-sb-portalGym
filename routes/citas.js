@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const pool = require("../config");
+
 //Insertar citas
 router.post("/citas", async (req, res) => {
   const { fecha_cita, nombre_cliente, nombre_gym, hora_cita } = req.body;
@@ -27,7 +28,9 @@ router.post("/citas", async (req, res) => {
 router.get("/get-citas/:id_cliente", async (req, res) => {
   try {
     const id_cliente = req.params.id_cliente;
-    const query = `SELECT ci.id_cita, TO_CHAR(ci.fecha_cita, 'DD-MM-YYYY'), ci.hora_cita, g.nombre_gym FROM cita ci JOIN cliente c ON c.id_cliente = c.id_cliente JOIN gimnasio g ON g.id_gym=ci.id_gym WHERE c.id_cliente =$1 `;
+    // eslint-disable-next-line no-console
+    console.log(id_cliente);
+    const query = `SELECT ci.id_cita, TO_CHAR(ci.fecha_cita, 'DD-MM-YYYY'), ci.hora_cita, g.nombre_gym FROM cita ci JOIN cliente c ON c.id_cliente = ci.id_cliente JOIN gimnasio g ON g.id_gym = ci.id_gym WHERE c.id_cliente = $1`;
     const result = await pool.query(query, [id_cliente]);
     // eslint-disable-next-line no-console
     /*  console.log(result) */
@@ -87,4 +90,41 @@ router.delete("/borrar-citas/:id_cita", async (req, res) => {
     res.status(500).json({ mensaje: "Error interno del servidor" });
   }
 });
+
+router.get("/citas-responsable/:id_responsable", async (req, res) => {
+  const id_responsable = req.params.id_responsable;
+
+  try {
+    const query = `SELECT ci.id_cita,  TO_CHAR(ci.fecha_cita, 'DD-MM-YYYY'), ci.hora_cita, c.nombre_cliente, g.nombre_gym 
+      FROM cita ci 
+      JOIN cliente c ON ci.id_cliente = c.id_cliente 
+      JOIN gimnasio g ON ci.id_gym = g.id_gym 
+      WHERE g.id_gym IN (
+        SELECT id_gym FROM gimnasio WHERE id_responsable = $1
+      );`;
+    const result = await pool.query(query, [id_responsable]);
+    const citasGym = result.rows;
+
+    res.json(citasGym);
+    // eslint-disable-next-line no-console
+    console.log(citasGym);
+  } catch (error) {
+    console.error(error);
+    res.sendStatus(500); // Devuelve un código de estado 500 si hay algún error
+  }
+});
+
+router.delete("/responsable-borrar-cita/:id_cita", async (req, res) => {
+  const id_cita = req.params.id_cita;
+
+  try {
+    const query = "DELETE FROM cita WHERE id_cita = $1";
+    await pool.query(query, [id_cita]);
+    res.sendStatus(204); // Devuelve un código de estado 204 si la cita fue eliminada correctamente
+  } catch (error) {
+    console.error(error);
+    res.sendStatus(500); // Devuelve un código de estado 500 si hay algún error
+  }
+});
+
 module.exports = router;

@@ -32,7 +32,7 @@ router.post("/cliente", async (req, res) => {
   const hashedPassword = await bcrypt.hash(contraseña_cliente, 10);
 
   pool.query(
-    "INSERT INTO cliente (nombre_cliente,apellidos_cliente, email_cliente,fnac_cliente,contraseña_cliente) VALUES ($1, $2, $3, $4, $5)",
+    "INSERT INTO cliente (nombre_cliente,apellidos_cliente, email_cliente,fnac_cliente,contraseña_cliente) VALUES ($1, $2, $3, $4, $5)RETURNING id_cliente,nombre_cliente,apellidos_cliente, email_cliente,fnac_cliente",
     [
       nombre_cliente,
       apellidos_cliente,
@@ -47,9 +47,24 @@ router.post("/cliente", async (req, res) => {
           .status(500)
           .send(JSON.stringify({ message: "Error al crear usuario" }));
       } else {
-        res
-          .status(201)
-          .send(JSON.stringify({ message: "Usuario creado exitosamente" }));
+        const resultado = result.rows[0];
+        const {
+          id_cliente,
+          nombre_cliente,
+          apellidos_cliente,
+          email_cliente,
+          fnac_cliente,
+        } = resultado;
+        res.status(201).send(
+          JSON.stringify({
+            message: "Usuario creado exitosamente",
+            id_cliente: id_cliente,
+            nombre_cliente: nombre_cliente,
+            apellidos_cliente: apellidos_cliente,
+            email_cliente: email_cliente,
+            fnac_cliente: fnac_cliente,
+          })
+        );
       }
     }
   );
@@ -79,11 +94,10 @@ router.post("/admin", async (req, res) => {
       );
   }
 
-  // Insertar el nuevo cliente
+  // Insertar el nuevo responsable
   const hashedPassword = await bcrypt.hash(contraseña_responsable, 10);
-
   pool.query(
-    "INSERT INTO responsable (nombre_responsable,apellidos_responsable, email_responsable,telefono_responsable,contraseña_responsable) VALUES ($1, $2, $3, $4, $5)",
+    "INSERT INTO responsable (nombre_responsable, apellidos_responsable, email_responsable, telefono_responsable, contraseña_responsable) VALUES ($1, $2, $3, $4, $5) RETURNING id_responsable,nombre_responsable, apellidos_responsable, email_responsable, telefono_responsable",
     [
       nombre_responsable,
       apellidos_responsable,
@@ -98,9 +112,24 @@ router.post("/admin", async (req, res) => {
           .status(500)
           .send(JSON.stringify({ message: "Error al crear usuario" }));
       } else {
-        res
-          .status(201)
-          .send(JSON.stringify({ message: "Usuario creado exitosamente" }));
+        const resultado = result.rows[0];
+        const {
+          id_responsable,
+          nombre_responsable,
+          apellidos_responsable,
+          email_responsable,
+          telefono_responsable,
+        } = resultado;
+        res.status(201).send(
+          JSON.stringify({
+            message: "Usuario creado exitosamente",
+            id_responsable: id_responsable,
+            nombre_responsable: nombre_responsable,
+            apellidos_responsable: apellidos_responsable,
+            email_responsable: email_responsable,
+            telefono_responsable: telefono_responsable,
+          })
+        );
       }
     }
   );

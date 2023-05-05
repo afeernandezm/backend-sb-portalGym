@@ -44,4 +44,43 @@ router.get("/get-gimnasios", async (req, res) => {
     res.sendStatus(500); // Devuelve un código de estado 500 si hay algún error
   }
 });
+
+router.get("/info-gimnasio/:id_responsable", async (req, res) => {
+  const id_responsable = req.params.id_responsable;
+
+  try {
+    const query = "SELECT * FROM gimnasio WHERE id_responsable = $1";
+    const result = await pool.query(query, [id_responsable]);
+    const gimnasio = result.rows;
+
+    res.send(gimnasio);
+  } catch (error) {
+    console.error(error);
+    res.sendStatus(500); // Devuelve un código de estado 500 si hay algún error
+  }
+});
+
+//Insertar gimnasio
+router.post("/insertar-gimnasio", async (req, res) => {
+  const { nombre_gym, email_gym, direccion_gym, telefono, id_responsable } =
+    req.body;
+
+  try {
+    const query =
+      "INSERT INTO gimnasio (nombre_gym, email_gym, direccion_gym, telefono, id_responsable) VALUES ($1, $2, $3, $4, $5) RETURNING *";
+    const result = await pool.query(query, [
+      nombre_gym,
+      email_gym,
+      direccion_gym,
+      telefono,
+      id_responsable,
+    ]);
+    const gimnasio = result.rows[0];
+
+    res.send(gimnasio);
+  } catch (error) {
+    console.error(error);
+    res.sendStatus(500); // Devuelve un código de estado 500 si hay algún error
+  }
+});
 module.exports = router;
