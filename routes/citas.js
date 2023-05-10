@@ -25,7 +25,7 @@ router.post("/citas", async (req, res) => {
 });
 
 // Endpoint para obtener la lista de citas
-router.get("/get-citas/:id_cliente", async (req, res) => {
+router.get("/citas/get-citas/:id_cliente", async (req, res) => {
   try {
     const id_cliente = req.params.id_cliente;
     // eslint-disable-next-line no-console
@@ -71,7 +71,7 @@ router.put("/citas/:id_cita", async (req, res) => {
 });
 
 //Borrar cita
-router.delete("/borrar-citas/:id_cita", async (req, res) => {
+router.delete("/citas/borrar-citas/:id_cita", async (req, res) => {
   try {
     const id = req.params.id_cita;
 
@@ -91,7 +91,7 @@ router.delete("/borrar-citas/:id_cita", async (req, res) => {
   }
 });
 
-router.get("/citas-responsable/:id_responsable", async (req, res) => {
+router.get("/citas/citas-responsable/:id_responsable", async (req, res) => {
   const id_responsable = req.params.id_responsable;
 
   try {
@@ -114,7 +114,7 @@ router.get("/citas-responsable/:id_responsable", async (req, res) => {
   }
 });
 
-router.delete("/responsable-borrar-cita/:id_cita", async (req, res) => {
+router.delete("/citas/responsable-borrar-cita/:id_cita", async (req, res) => {
   const id_cita = req.params.id_cita;
 
   try {

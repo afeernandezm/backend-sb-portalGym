@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const pool = require("../config");
 // Endpoint para obtener la lista de ejercicios
-router.get("/get-ejercicios/:id_cliente", async (req, res) => {
+router.get("/ejercicios/get-ejercicios/:id_cliente", async (req, res) => {
   try {
     const id_cliente = req.params.id_cliente;
     const query = `SELECT e.id_ejercicio, e.nombre_ejercicio,e.series,e.repeticiones
@@ -103,30 +103,34 @@ router.put("/ejercicios/:id_ejercicio", async (req, res) => {
 });
 
 //borrar ejercicio
-router.delete("/borrar-ejercicios/:id_ejercicio", async (req, res) => {
-  try {
-    const id = req.params.id_ejercicio;
+router.delete(
+  "/ejercicios/borrar-ejercicios/:id_ejercicio",
+  async (req, res) => {
+    try {
+      const id = req.params.id_ejercicio;
 
-    // Eliminamos todas las relaciones existentes con los clientes
-    await pool.query("DELETE FROM cliente_ejercicio WHERE id_ejercicio = $1", [
-      id,
-    ]);
+      // Eliminamos todas las relaciones existentes con los clientes
+      await pool.query(
+        "DELETE FROM cliente_ejercicio WHERE id_ejercicio = $1",
+        [id]
+      );
 
-    // Eliminamos el ejercicio de la base de datos
-    const { rows: ejerciciosRows } = await pool.query(
-      "DELETE FROM ejercicio WHERE id_ejercicio = $1 RETURNING *",
-      [id]
-    );
+      // Eliminamos el ejercicio de la base de datos
+      const { rows: ejerciciosRows } = await pool.query(
+        "DELETE FROM ejercicio WHERE id_ejercicio = $1 RETURNING *",
+        [id]
+      );
 
-    if (!ejerciciosRows[0]) {
-      return res.status(404).json({ mensaje: "Ejercicio no encontrado" });
+      if (!ejerciciosRows[0]) {
+        return res.status(404).json({ mensaje: "Ejercicio no encontrado" });
+      }
+
+      res.status(200).json({ mensaje: "Ejercicio eliminado correctamente" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ mensaje: "Error interno del servidor" });
     }
-
-    res.status(200).json({ mensaje: "Ejercicio eliminado correctamente" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: "Error interno del servidor" });
   }
-});
+);
 
 module.exports = router;

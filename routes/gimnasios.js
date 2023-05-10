@@ -17,7 +17,7 @@ router.get("/gimnasios", async (req, res) => {
   }
 });
 
-router.get("/get-gimnasios", async (req, res) => {
+router.get("/gimnasios/get-gimnasios", async (req, res) => {
   try {
     const query =
       "SELECT g.*, r.* FROM gimnasio g INNER JOIN responsable r ON g.id_responsable = r.id_responsable";
@@ -45,7 +45,7 @@ router.get("/get-gimnasios", async (req, res) => {
   }
 });
 
-router.get("/info-gimnasio/:id_responsable", async (req, res) => {
+router.get("/gimnasios/info-gimnasio/:id_responsable", async (req, res) => {
   const id_responsable = req.params.id_responsable;
 
   try {
@@ -61,7 +61,7 @@ router.get("/info-gimnasio/:id_responsable", async (req, res) => {
 });
 
 //Insertar gimnasio
-router.post("/insertar-gimnasio", async (req, res) => {
+router.post("/gimnasios/insertar-gimnasio", async (req, res) => {
   const { nombre_gym, email_gym, direccion_gym, telefono, id_responsable } =
     req.body;
 

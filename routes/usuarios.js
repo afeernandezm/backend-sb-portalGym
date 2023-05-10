@@ -4,7 +4,7 @@ const bcrypt = require("bcryptjs");
 const pool = require("../config");
 
 //Insertar cliente
-router.post("/cliente", async (req, res) => {
+router.post("/usuarios/cliente", async (req, res) => {
   const {
     nombre_cliente,
     apellidos_cliente,
@@ -70,7 +70,7 @@ router.post("/cliente", async (req, res) => {
   );
 });
 
-router.post("/admin", async (req, res) => {
+router.post("/usuarios/admin", async (req, res) => {
   const {
     nombre_responsable,
     apellidos_responsable,
@@ -136,7 +136,7 @@ router.post("/admin", async (req, res) => {
 });
 
 //Iniciar sesion cliente
-router.post("/iniciar-sesion", async (req, res) => {
+router.post("/usuarios/iniciar-sesion", async (req, res) => {
   const { email_cliente, contraseña_cliente } = req.body;
 
   // Verificar si ya existe un cliente con el mismo correo electrónico
@@ -178,7 +178,7 @@ router.post("/iniciar-sesion", async (req, res) => {
 });
 
 //Iniciar sesion admin
-router.post("/iniciar-sesion-admin", async (req, res) => {
+router.post("/usuarios/iniciar-sesion-admin", async (req, res) => {
   const { email_responsable, contraseña_responsable } = req.body;
 
   // Verificar si ya existe un cliente con el mismo correo electrónico
