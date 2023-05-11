@@ -1,13 +1,13 @@
 const express = require("express");
 
 const path = require("path");
-
 const cors = require("cors");
 
 const usuarioRoutes = require("./routes/usuarios");
 const citasRoutes = require("./routes/citas");
 const ejerciciosRoutes = require("./routes/ejercicios");
 const gimnasiosRoutes = require("./routes/gimnasios");
+const direccionesRoutes = require("./routes/direccion");
 
 const session = require("express-session");
 
@@ -31,10 +31,7 @@ app.use("/portalGym", usuarioRoutes);
 app.use("/portalGym", citasRoutes);
 app.use("/portalGym", gimnasiosRoutes);
 app.use("/portalGym", ejerciciosRoutes);
-
-/* app.use("/autol", profesorRoutes);
-
-app.use("/autol", autoescuelaRoutes); */
+app.use("/portalGym", direccionesRoutes);
 
 app.use(express.static(path.join(__dirname, "public")));
 
