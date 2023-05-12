@@ -60,10 +60,35 @@ router.get("/gimnasios/info-gimnasio/:id_responsable", async (req, res) => {
   }
 });
 
-//Insertar gimnasio
+// Insertar gimnasio
 router.post("/gimnasios/insertar-gimnasio", async (req, res) => {
   const { nombre_gym, email_gym, direccion_gym, telefono, id_responsable } =
     req.body;
+
+  // Verificar que el teléfono tenga exactamente 9 caracteres
+  if (telefono.length !== 9) {
+    return res.status(400).send(
+      JSON.stringify({
+        message: "El teléfono debe tener 9 caracteres y numericos",
+      })
+    );
+  }
+
+  // Verificar que el teléfono contenga solo dígitos numéricos
+  if (!/^\d+$/.test(telefono)) {
+    return res.status(400).send(
+      JSON.stringify({
+        message: "El teléfono debe contener solo dígitos numéricos",
+      })
+    );
+  }
+
+  // Verificar que el correo electrónico contenga el símbolo "@"
+  if (!email_gym.includes("@")) {
+    return res
+      .status(400)
+      .send(JSON.stringify({ message: "El correo electrónico no es válido" }));
+  }
 
   try {
     const query =
@@ -83,4 +108,5 @@ router.post("/gimnasios/insertar-gimnasio", async (req, res) => {
     res.sendStatus(500); // Devuelve un código de estado 500 si hay algún error
   }
 });
+
 module.exports = router;

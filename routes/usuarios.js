@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const pool = require("../config");
 
-//Insertar cliente
+// Insertar cliente
 router.post("/usuarios/cliente", async (req, res) => {
   const {
     nombre_cliente,
@@ -28,11 +28,28 @@ router.post("/usuarios/cliente", async (req, res) => {
       );
   }
 
+  // Verificar que el correo electrónico contenga un "@"
+  if (!email_cliente.includes("@")) {
+    return res
+      .status(400)
+      .send(JSON.stringify({ message: "El correo electrónico no es válido" }));
+  }
+
+  // Verificar que la contraseña tenga al menos 8 caracteres con mayúsculas y minúsculas
+  if (!/(?=.*[a-z])(?=.*[A-Z]).{8,}/.test(contraseña_cliente)) {
+    return res.status(400).send(
+      JSON.stringify({
+        message:
+          "La contraseña debe tener al menos 8 caracteres con mayúsculas y minúsculas",
+      })
+    );
+  }
+
   // Insertar el nuevo cliente
   const hashedPassword = await bcrypt.hash(contraseña_cliente, 10);
 
   pool.query(
-    "INSERT INTO cliente (nombre_cliente,apellidos_cliente, email_cliente,fnac_cliente,contraseña_cliente) VALUES ($1, $2, $3, $4, $5)RETURNING id_cliente,nombre_cliente,apellidos_cliente, email_cliente,fnac_cliente",
+    "INSERT INTO cliente (nombre_cliente, apellidos_cliente, email_cliente, fnac_cliente, contraseña_cliente) VALUES ($1, $2, $3, $4, $5) RETURNING id_cliente, nombre_cliente, apellidos_cliente, email_cliente, fnac_cliente",
     [
       nombre_cliente,
       apellidos_cliente,
@@ -94,10 +111,44 @@ router.post("/usuarios/admin", async (req, res) => {
       );
   }
 
+  // Verificar la longitud y el formato de la contraseña
+  if (
+    contraseña_responsable.length < 8 ||
+    !/[a-z]/.test(contraseña_responsable) ||
+    !/[A-Z]/.test(contraseña_responsable)
+  ) {
+    // Si la contraseña no cumple con los requisitos, mostrar un mensaje de error
+    return res.status(400).send(
+      JSON.stringify({
+        message:
+          "La contraseña debe tener al menos 8 caracteres, incluyendo al menos una letra mayúscula y una letra minúscula",
+      })
+    );
+  }
+
+  // Verificar la longitud y el formato del teléfono
+  if (!/^\d{9}$/.test(telefono_responsable)) {
+    // Si el teléfono no tiene exactamente 9 dígitos, mostrar un mensaje de error
+    return res.status(400).send(
+      JSON.stringify({
+        message:
+          "El teléfono debe tener exactamente 9 dígitos y que sean numericos",
+      })
+    );
+  }
+
   // Insertar el nuevo responsable
   const hashedPassword = await bcrypt.hash(contraseña_responsable, 10);
+
+  // Verificar que el correo electrónico contenga un "@"
+  if (!email_responsable.includes("@")) {
+    return res
+      .status(400)
+      .send(JSON.stringify({ message: "El correo electrónico no es válido" }));
+  }
+
   pool.query(
-    "INSERT INTO responsable (nombre_responsable, apellidos_responsable, email_responsable, telefono_responsable, contraseña_responsable) VALUES ($1, $2, $3, $4, $5) RETURNING id_responsable,nombre_responsable, apellidos_responsable, email_responsable, telefono_responsable",
+    "INSERT INTO responsable (nombre_responsable, apellidos_responsable, email_responsable, telefono_responsable, contraseña_responsable) VALUES ($1, $2, $3, $4, $5) RETURNING id_responsable, nombre_responsable, apellidos_responsable, email_responsable, telefono_responsable",
     [
       nombre_responsable,
       apellidos_responsable,
@@ -108,36 +159,47 @@ router.post("/usuarios/admin", async (req, res) => {
     (err, result) => {
       if (err) {
         console.error("Error al crear usuario", err);
-        res
+        return res
           .status(500)
           .send(JSON.stringify({ message: "Error al crear usuario" }));
-      } else {
-        const resultado = result.rows[0];
-        const {
+      }
+
+      const resultado = result.rows[0];
+      const {
+        id_responsable,
+        nombre_responsable,
+        apellidos_responsable,
+        email_responsable,
+        telefono_responsable,
+      } = resultado;
+
+      res.status(201).send(
+        JSON.stringify({
+          message: "Usuario creado exitosamente",
           id_responsable,
           nombre_responsable,
           apellidos_responsable,
           email_responsable,
           telefono_responsable,
-        } = resultado;
-        res.status(201).send(
-          JSON.stringify({
-            message: "Usuario creado exitosamente",
-            id_responsable: id_responsable,
-            nombre_responsable: nombre_responsable,
-            apellidos_responsable: apellidos_responsable,
-            email_responsable: email_responsable,
-            telefono_responsable: telefono_responsable,
-          })
-        );
-      }
+        })
+      );
     }
   );
 });
 
-//Iniciar sesion cliente
+// Iniciar sesión cliente
 router.post("/usuarios/iniciar-sesion", async (req, res) => {
   const { email_cliente, contraseña_cliente } = req.body;
+
+  // Verificar si el correo electrónico tiene el símbolo "@"
+  if (!email_cliente.includes("@")) {
+    return res.status(400).send(
+      JSON.stringify({
+        success: false,
+        message: "Correo electrónico no válido",
+      })
+    );
+  }
 
   // Verificar si ya existe un cliente con el mismo correo electrónico
   const emailExists = await pool.query(

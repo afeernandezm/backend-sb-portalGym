@@ -2,23 +2,40 @@ const express = require("express");
 const axios = require("axios");
 const router = express.Router();
 
-const apiKey = "NDZFKof4ds4eegT0vXSe";
+const apiKey = "WuT5AJaMhcIbVEMx02J5";
+const apiUrl = "https://api.maptiler.com/geocoding/";
 
-router.get("/geocode", async (req, res) => {
+/* router.get("/direcciones/geocode", async (req, res) => {
   const { address } = req.query;
-  const url = `https://api.mapliter.com/geocode?address=${encodeURIComponent(
-    address
-  )}&key=${apiKey}`;
 
   try {
-    const response = await axios.get(url);
-    const data = response.data;
-    res.json(data);
+    const response = await axios.get(
+      `${apiUrl}${encodeURIComponent(address)}.json?key=${apiKey}`
+    );
+
+    res.json(response.data);
+  } catch (error) {
+    console.error("Error en la solicitud de geocodificación:", error);
+    res.status(500).json({ error: "Error en la geocodificación" });
+  }
+}); */
+router.get("/direcciones/geocode", async (req, res) => {
+  const { address } = req.query;
+
+  try {
+    const encodedAddress = encodeURIComponent(address);
+    const response = await axios.get(`${apiUrl}${encodedAddress}.json`, {
+      params: {
+        key: apiKey,
+        country: "es",
+        types: "street,address",
+      },
+    });
+
+    res.json(response.data);
   } catch (error) {
     console.error("Error en la solicitud de geocodificación:", error);
     res.status(500).json({ error: "Error en la geocodificación" });
   }
 });
-
 module.exports = router;
-

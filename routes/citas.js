@@ -30,7 +30,7 @@ router.get("/citas/get-citas/:id_cliente", async (req, res) => {
     const id_cliente = req.params.id_cliente;
     // eslint-disable-next-line no-console
     console.log(id_cliente);
-    const query = `SELECT ci.id_cita, TO_CHAR(ci.fecha_cita, 'DD-MM-YYYY'), ci.hora_cita, g.nombre_gym FROM cita ci JOIN cliente c ON c.id_cliente = ci.id_cliente JOIN gimnasio g ON g.id_gym = ci.id_gym WHERE c.id_cliente = $1`;
+    const query = `SELECT ci.id_cita, TO_CHAR(ci.fecha_cita, 'DD-MM-YYYY'), ci.hora_cita, g.nombre_gym FROM cita ci JOIN cliente c ON c.id_cliente = ci.id_cliente JOIN gimnasio g ON g.id_gym = ci.id_gym WHERE c.id_cliente = $1 ORDER BY ci.fecha_cita DESC`;
     const result = await pool.query(query, [id_cliente]);
     // eslint-disable-next-line no-console
     /*  console.log(result) */
@@ -101,7 +101,7 @@ router.get("/citas/citas-responsable/:id_responsable", async (req, res) => {
       JOIN gimnasio g ON ci.id_gym = g.id_gym 
       WHERE g.id_gym IN (
         SELECT id_gym FROM gimnasio WHERE id_responsable = $1
-      );`;
+      )  ORDER BY ci.fecha_cita DESC;;`;
     const result = await pool.query(query, [id_responsable]);
     const citasGym = result.rows;
 
