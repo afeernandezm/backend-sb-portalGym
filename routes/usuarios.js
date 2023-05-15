@@ -35,12 +35,14 @@ router.post("/usuarios/cliente", async (req, res) => {
       .send(JSON.stringify({ message: "El correo electrónico no es válido" }));
   }
 
-  // Verificar que la contraseña tenga al menos 8 caracteres con mayúsculas y minúsculas
-  if (!/(?=.*[a-z])(?=.*[A-Z]).{8,}/.test(contraseña_cliente)) {
+  // Verificar que la contraseña tenga al menos 8 caracteres con mayúsculas, minúsculas y un carácter especial
+  if (
+    !/(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}/.test(contraseña_cliente)
+  ) {
     return res.status(400).send(
       JSON.stringify({
         message:
-          "La contraseña debe tener al menos 8 caracteres con mayúsculas y minúsculas",
+          "La contraseña debe tener al menos 8 caracteres con mayúsculas, minúsculas y un carácter especial",
       })
     );
   }
@@ -115,13 +117,14 @@ router.post("/usuarios/admin", async (req, res) => {
   if (
     contraseña_responsable.length < 8 ||
     !/[a-z]/.test(contraseña_responsable) ||
-    !/[A-Z]/.test(contraseña_responsable)
+    !/[A-Z]/.test(contraseña_responsable) ||
+    !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(contraseña_responsable)
   ) {
     // Si la contraseña no cumple con los requisitos, mostrar un mensaje de error
     return res.status(400).send(
       JSON.stringify({
         message:
-          "La contraseña debe tener al menos 8 caracteres, incluyendo al menos una letra mayúscula y una letra minúscula",
+          "La contraseña debe tener al menos 8 caracteres, incluyendo al menos una letra mayúscula, una letra minúscula y un carácter especial",
       })
     );
   }
