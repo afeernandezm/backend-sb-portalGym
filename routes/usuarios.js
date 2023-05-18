@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
-const pool = require("../config");
-
-// Insertar cliente
+/* const pool = require("../config"); */
+const supabase = require("../config");
+/// Insertar cliente
 router.post("/usuarios/cliente", async (req, res) => {
   const {
     nombre_cliente,
@@ -14,12 +14,20 @@ router.post("/usuarios/cliente", async (req, res) => {
   } = req.body;
 
   // Verificar si ya existe un cliente con el mismo correo electrónico
-  const emailExists = await pool.query(
-    "SELECT COUNT(*) FROM cliente WHERE email_cliente = $1",
-    [email_cliente]
-  );
+  const { data: emailExists, error: emailExistsError } = await supabase
+    .from("cliente")
+    .select("count", { count: "exact" })
+    .eq("email_cliente", email_cliente)
+    .single();
 
-  if (emailExists.rows[0].count > 0) {
+  if (emailExistsError) {
+    console.error("Error al verificar el correo electrónico", emailExistsError);
+    return res
+      .status(500)
+      .send(JSON.stringify({ message: "Error interno del servidor" }));
+  }
+
+  if (emailExists.count > 0) {
     // Si el correo electrónico ya existe, mostrar un mensaje de error
     return res
       .status(400)
@@ -37,12 +45,14 @@ router.post("/usuarios/cliente", async (req, res) => {
 
   // Verificar que la contraseña tenga al menos 8 caracteres con mayúsculas, minúsculas y un carácter especial
   if (
-    !/(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}/.test(contraseña_cliente)
+    !/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}/.test(
+      contraseña_cliente
+    )
   ) {
     return res.status(400).send(
       JSON.stringify({
         message:
-          "La contraseña debe tener al menos 8 caracteres con mayúsculas, minúsculas y un carácter especial",
+          "La contraseña debe tener al menos 8 caracteres con mayúsculas, minúsculas, un número y un carácter especial",
       })
     );
   }
@@ -50,196 +60,53 @@ router.post("/usuarios/cliente", async (req, res) => {
   // Insertar el nuevo cliente
   const hashedPassword = await bcrypt.hash(contraseña_cliente, 10);
 
-  pool.query(
-    "INSERT INTO cliente (nombre_cliente, apellidos_cliente, email_cliente, fnac_cliente, contraseña_cliente) VALUES ($1, $2, $3, $4, $5) RETURNING id_cliente, nombre_cliente, apellidos_cliente, email_cliente, fnac_cliente",
-    [
+  const { user, error: signUpError } = await supabase.auth.signUp({
+    email: email_cliente,
+    password: contraseña_cliente,
+  });
+
+  if (signUpError) {
+    console.error("Error al crear el usuario", signUpError);
+    return res
+      .status(500)
+      .send(JSON.stringify({ message: "Error al crear usuario" }));
+  }
+
+  const { id_cliente } = await supabase
+    .from("cliente")
+    .insert([
+      {
+        nombre_cliente,
+        apellidos_cliente,
+        email_cliente,
+        fnac_cliente,
+        contraseña_cliente: hashedPassword,
+      },
+    ])
+    .single();
+  // Buscar el cliente recién insertado por el correo electrónico
+  const { data: cliente, error: selectError } = await supabase
+    .from("cliente")
+    .select("id_cliente")
+    .eq("email_cliente", email_cliente)
+    .single();
+
+  if (selectError) {
+    console.error("Error al buscar el cliente", selectError);
+    return res
+      .status(500)
+      .send(JSON.stringify({ message: "Error al crear usuario" }));
+  }
+  res.status(201).send(
+    JSON.stringify({
+      message: "Usuario creado exitosamente",
+      id_cliente: cliente.id_cliente,
       nombre_cliente,
       apellidos_cliente,
       email_cliente,
       fnac_cliente,
-      hashedPassword,
-    ],
-    (err, result) => {
-      if (err) {
-        console.error("Error al crear usuario", err);
-        res
-          .status(500)
-          .send(JSON.stringify({ message: "Error al crear usuario" }));
-      } else {
-        const resultado = result.rows[0];
-        const {
-          id_cliente,
-          nombre_cliente,
-          apellidos_cliente,
-          email_cliente,
-          fnac_cliente,
-        } = resultado;
-        res.status(201).send(
-          JSON.stringify({
-            message: "Usuario creado exitosamente",
-            id_cliente: id_cliente,
-            nombre_cliente: nombre_cliente,
-            apellidos_cliente: apellidos_cliente,
-            email_cliente: email_cliente,
-            fnac_cliente: fnac_cliente,
-          })
-        );
-      }
-    }
+    })
   );
-});
-
-router.post("/usuarios/admin", async (req, res) => {
-  const {
-    nombre_responsable,
-    apellidos_responsable,
-    email_responsable,
-    telefono_responsable,
-    contraseña_responsable,
-  } = req.body;
-
-  // Verificar si ya existe un cliente con el mismo correo electrónico
-  const emailExists = await pool.query(
-    "SELECT COUNT(*) FROM responsable WHERE email_responsable = $1",
-    [email_responsable]
-  );
-
-  if (emailExists.rows[0].count > 0) {
-    // Si el correo electrónico ya existe, mostrar un mensaje de error
-    return res
-      .status(400)
-      .send(
-        JSON.stringify({ message: "El correo electrónico ya está en uso" })
-      );
-  }
-
-  // Verificar la longitud y el formato de la contraseña
-  if (
-    contraseña_responsable.length < 8 ||
-    !/[a-z]/.test(contraseña_responsable) ||
-    !/[A-Z]/.test(contraseña_responsable) ||
-    !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(contraseña_responsable)
-  ) {
-    // Si la contraseña no cumple con los requisitos, mostrar un mensaje de error
-    return res.status(400).send(
-      JSON.stringify({
-        message:
-          "La contraseña debe tener al menos 8 caracteres, incluyendo al menos una letra mayúscula, una letra minúscula y un carácter especial",
-      })
-    );
-  }
-
-  // Verificar la longitud y el formato del teléfono
-  if (!/^\d{9}$/.test(telefono_responsable)) {
-    // Si el teléfono no tiene exactamente 9 dígitos, mostrar un mensaje de error
-    return res.status(400).send(
-      JSON.stringify({
-        message:
-          "El teléfono debe tener exactamente 9 dígitos y que sean numericos",
-      })
-    );
-  }
-
-  // Insertar el nuevo responsable
-  const hashedPassword = await bcrypt.hash(contraseña_responsable, 10);
-
-  // Verificar que el correo electrónico contenga un "@"
-  if (!email_responsable.includes("@")) {
-    return res
-      .status(400)
-      .send(JSON.stringify({ message: "El correo electrónico no es válido" }));
-  }
-
-  pool.query(
-    "INSERT INTO responsable (nombre_responsable, apellidos_responsable, email_responsable, telefono_responsable, contraseña_responsable) VALUES ($1, $2, $3, $4, $5) RETURNING id_responsable, nombre_responsable, apellidos_responsable, email_responsable, telefono_responsable",
-    [
-      nombre_responsable,
-      apellidos_responsable,
-      email_responsable,
-      telefono_responsable,
-      hashedPassword,
-    ],
-    (err, result) => {
-      if (err) {
-        console.error("Error al crear usuario", err);
-        return res
-          .status(500)
-          .send(JSON.stringify({ message: "Error al crear usuario" }));
-      }
-
-      const resultado = result.rows[0];
-      const {
-        id_responsable,
-        nombre_responsable,
-        apellidos_responsable,
-        email_responsable,
-        telefono_responsable,
-      } = resultado;
-
-      res.status(201).send(
-        JSON.stringify({
-          message: "Usuario creado exitosamente",
-          id_responsable,
-          nombre_responsable,
-          apellidos_responsable,
-          email_responsable,
-          telefono_responsable,
-        })
-      );
-    }
-  );
-});
-
-// Iniciar sesión cliente
-router.post("/usuarios/iniciar-sesion", async (req, res) => {
-  const { email_cliente, contraseña_cliente } = req.body;
-
-  // Verificar si el correo electrónico tiene el símbolo "@"
-  if (!email_cliente.includes("@")) {
-    return res.status(400).send(
-      JSON.stringify({
-        success: false,
-        message: "Correo electrónico no válido",
-      })
-    );
-  }
-
-  // Verificar si ya existe un cliente con el mismo correo electrónico
-  const emailExists = await pool.query(
-    "SELECT * FROM cliente WHERE email_cliente = $1",
-    [email_cliente]
-  );
-
-  if (emailExists.rows.length > 0) {
-    // Si el correo electrónico ya existe, verificar la contraseña
-    const user = emailExists.rows[0];
-    const passwordMatches = await bcrypt.compare(
-      contraseña_cliente,
-      user.contraseña_cliente
-    );
-
-    if (passwordMatches) {
-      // Si la contraseña coincide, iniciar sesión exitosamente
-      // eslint-disable-next-line no-console
-      console.log(user.nombre_cliente);
-      const { id_cliente, nombre_cliente } = user;
-      return res.status(200).send(
-        JSON.stringify({
-          success: true,
-          message: "Inicio de sesión exitoso",
-          id_cliente,
-          nombre_cliente,
-        })
-      );
-    } else {
-      // Si la contraseña no coincide, mostrar un mensaje de error
-      return res
-        .status(400)
-        .send(
-          JSON.stringify({ success: false, message: "Contraseña incorrecta" })
-        );
-    }
-  }
 });
 
 //Iniciar sesion admin
@@ -247,14 +114,25 @@ router.post("/usuarios/iniciar-sesion-admin", async (req, res) => {
   const { email_responsable, contraseña_responsable } = req.body;
 
   // Verificar si ya existe un cliente con el mismo correo electrónico
-  const emailExists = await pool.query(
-    "SELECT * FROM responsable WHERE email_responsable = $1",
-    [email_responsable]
-  );
+  const { data: emailExists, error: emailExistsError } = await supabase
+    .from("responsable")
+    .select("*")
+    .eq("email_responsable", email_responsable)
+    .single();
 
-  if (emailExists.rows.length > 0) {
+  if (emailExistsError) {
+    console.error("Error al verificar el correo electrónico", emailExistsError);
+    return res.status(500).send(
+      JSON.stringify({
+        success: false,
+        message: "Error interno del servidor",
+      })
+    );
+  }
+
+  if (emailExists) {
     // Si el correo electrónico ya existe, verificar la contraseña
-    const user = emailExists.rows[0];
+    const user = emailExists;
     const passwordMatches = await bcrypt.compare(
       contraseña_responsable,
       user.contraseña_responsable
@@ -272,6 +150,172 @@ router.post("/usuarios/iniciar-sesion-admin", async (req, res) => {
           id_responsable,
           nombre_responsable,
           email_responsable,
+        })
+      );
+    } else {
+      // Si la contraseña no coincide, mostrar un mensaje de error
+      return res
+        .status(400)
+        .send(
+          JSON.stringify({ success: false, message: "Contraseña incorrecta" })
+        );
+    }
+  }
+});
+
+router.post("/usuarios/admin", async (req, res) => {
+  const {
+    nombre_responsable,
+    apellidos_responsable,
+    email_responsable,
+    telefono_responsable,
+    contraseña_responsable,
+  } = req.body;
+
+  // Verificar si ya existe un cliente con el mismo correo electrónico
+  const { data: emailExists, error: emailExistsError } = await supabase
+    .from("responsable")
+    .select("count", { count: "exact" })
+    .eq("email_responsable", email_responsable)
+    .single();
+
+  if (emailExistsError) {
+    console.error("Error al verificar el correo electrónico", emailExistsError);
+    return res
+      .status(500)
+      .send(JSON.stringify({ message: "Error interno del servidor" }));
+  }
+
+  if (emailExists.count > 0) {
+    // Si el correo electrónico ya existe, mostrar un mensaje de error
+    return res
+      .status(400)
+      .send(
+        JSON.stringify({ message: "El correo electrónico ya está en uso" })
+      );
+  }
+
+  // Verificar que el correo electrónico contenga un "@"
+  if (!email_responsable.includes("@")) {
+    return res
+      .status(400)
+      .send(JSON.stringify({ message: "El correo electrónico no es válido" }));
+  }
+  // Verificar que el número de teléfono tenga exactamente 9 caracteres
+  if (telefono_responsable.length !== 9) {
+    return res.status(400).send(
+      JSON.stringify({
+        message: "El número de teléfono debe tener exactamente 9 caracteres",
+      })
+    );
+  }
+  // Verificar que la contraseña tenga al menos 8 caracteres con mayúsculas, minúsculas y un carácter especial
+  if (
+    !/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}/.test(
+      contraseña_responsable
+    )
+  ) {
+    return res.status(400).send(
+      JSON.stringify({
+        message:
+          "La contraseña debe tener al menos 8 caracteres con mayúsculas, minúsculas, un número y un carácter especial",
+      })
+    );
+  }
+
+  // Insertar el nuevo responsable
+  const hashedPassword = await bcrypt.hash(contraseña_responsable, 10);
+
+  const { user, error: signUpError } = await supabase.auth.signUp({
+    email: email_responsable,
+    password: contraseña_responsable,
+  });
+
+  if (signUpError) {
+    console.error("Error al crear el usuario", signUpError);
+    return res
+      .status(500)
+      .send(JSON.stringify({ message: "Error al crear usuario" }));
+  }
+
+  const { id_responsable } = await supabase
+    .from("responsable")
+    .insert([
+      {
+        nombre_responsable,
+        apellidos_responsable,
+        email_responsable,
+        telefono_responsable,
+        contraseña_responsable: hashedPassword,
+      },
+    ])
+    .single();
+ // Buscar el responsable recién insertado por el correo electrónico
+ const { data: responsable, error: selectError } = await supabase
+ .from("responsable")
+ .select("id_responsable")
+ .eq("email_responsable", email_responsable)
+ .single();
+
+if (selectError) {
+ console.error("Error al buscar el responsable", selectError);
+ return res
+   .status(500)
+   .send(JSON.stringify({ message: "Error al crear responsable" }));
+}
+  res.status(201).send(
+    JSON.stringify({
+      message: "Usuario creado exitosamente",
+      id_responsable: responsable.id_responsable,
+      nombre_responsable,
+      apellidos_responsable,
+      email_responsable,
+      telefono_responsable,
+    })
+  );
+});
+
+//Iniciar sesion cliente
+router.post("/usuarios/iniciar-sesion", async (req, res) => {
+  const { email_cliente, contraseña_cliente } = req.body;
+
+  // Verificar si ya existe un cliente con el mismo correo electrónico
+  const { data: emailExists, error: emailExistsError } = await supabase
+    .from("cliente")
+    .select("*")
+    .eq("email_cliente", email_cliente)
+    .single();
+
+  if (emailExistsError) {
+    console.error("Error al verificar el correo electrónico", emailExistsError);
+    return res.status(500).send(
+      JSON.stringify({
+        success: false,
+        message: "Error interno del servidor",
+      })
+    );
+  }
+
+  if (emailExists) {
+    // Si el correo electrónico ya existe, verificar la contraseña
+    const user = emailExists;
+    const passwordMatches = await bcrypt.compare(
+      contraseña_cliente,
+      user.contraseña_cliente
+    );
+
+    if (passwordMatches) {
+      // Si la contraseña coincide, iniciar sesión exitosamente
+      // eslint-disable-next-line no-console
+      console.log(user.nombre_cliente);
+      const { id_cliente, nombre_cliente, email_cliente } = user;
+      return res.status(200).send(
+        JSON.stringify({
+          success: true,
+          message: "Inicio de sesión exitoso",
+          id_cliente,
+          nombre_cliente,
+          email_cliente,
         })
       );
     } else {

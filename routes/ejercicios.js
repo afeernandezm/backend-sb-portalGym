@@ -2,70 +2,83 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const pool = require("../config");
+const supabase = require("../config");
 // Endpoint para obtener la lista de ejercicios
 router.get("/ejercicios/get-ejercicios/:id_cliente", async (req, res) => {
   try {
     const id_cliente = req.params.id_cliente;
-    const query = `SELECT e.id_ejercicio, e.nombre_ejercicio,e.series,e.repeticiones
-      FROM cliente c
-      JOIN cliente_ejercicio ce ON c.id_cliente = ce.id_cliente
-      JOIN ejercicio e ON ce.id_ejercicio = e.id_ejercicio
-      WHERE c.id_cliente = $1; `;
-    const result = await pool.query(query, [id_cliente]);
-    // eslint-disable-next-line no-console
-    /*  console.log(result) */
-    const cita = result.rows.map((rows) => rows); // Obtiene solo los nombres de los gimnasios
 
-    res.send(cita);
-    // eslint-disable-next-line no-console
-    console.log(cita);
-    // eslint-disable-next-line no-console
-    /* console.log(id_cliente) */
+    const { data, error } = await supabase
+      .from("cliente_ejercicio")
+      .select(
+        `
+        ejercicio (id_ejercicio: id_ejercicio, nombre_ejercicio, series, repeticiones)
+      `
+      )
+      .eq("id_cliente", id_cliente);
+
+    if (error) {
+      console.error(error);
+      res.sendStatus(500);
+    } else {
+      const ejercicios = data.map((row) => row.ejercicio);
+      res.send(ejercicios);
+      // eslint-disable-next-line no-console
+      console.log(ejercicios);
+    }
   } catch (error) {
     console.error(error);
-    res.sendStatus(500); // Devuelve un código de estado 500 si hay algún error
+    res.sendStatus(500);
   }
 });
 
 //Insertar ejercicios
 router.post("/ejercicios", async (req, res) => {
-  const { nombre_ejercicio, series, repeticiones } = req.body;
+  try {
+    const { nombre_ejercicio, series, repeticiones, id_cliente } = req.body;
 
-  pool.query(
-    "INSERT INTO ejercicio (nombre_ejercicio, series, repeticiones) VALUES ($1, $2, $3) RETURNING id_ejercicio",
-    [nombre_ejercicio, series, repeticiones],
-    (err, result) => {
-      if (err) {
-        console.error("Error al crear usuario", err);
+    const { error } = await supabase
+      .from("ejercicio")
+      .insert([{ nombre_ejercicio, series, repeticiones }]);
+
+    if (error) {
+      console.error(error);
+      res.status(500).json({ message: "Error al insertar ejercicio" });
+    } else {
+      // Obtener el id_ejercicio del ejercicio recién insertado
+      const { data, error: fetchError } = await supabase
+        .from("ejercicio")
+        .select("id_ejercicio")
+        .order("id_ejercicio", { ascending: false })
+        .limit(1);
+
+      if (fetchError) {
+        console.error(fetchError);
         res
           .status(500)
-          .send(JSON.stringify({ message: "Error al insertar ejercicio" }));
+          .json({ message: "Error al obtener el id del ejercicio" });
       } else {
-        const idEjercicio = result.rows[0].id_ejercicio;
-        const { id_cliente } = req.body;
-        pool.query(
-          "INSERT INTO cliente_ejercicio (id_cliente, id_ejercicio) VALUES ($1, $2);",
-          [id_cliente, idEjercicio],
-          (err, result) => {
-            if (err) {
-              console.error("Error al insertar datos en tabla intermedia", err);
-              res.status(500).send(
-                JSON.stringify({
-                  message: "Error al insertar datos en tabla intermedia",
-                })
-              );
-            } else {
-              res
-                .status(201)
-                .send(
-                  JSON.stringify({ message: "Ejercicio creado exitosamente" })
-                );
-            }
-          }
-        );
+        const id_ejercicio = data[0].id_ejercicio;
+
+        // Insertar en la tabla intermedia
+        const { error: intermediaError } = await supabase
+          .from("cliente_ejercicio")
+          .insert([{ id_cliente, id_ejercicio }]);
+
+        if (intermediaError) {
+          console.error(intermediaError);
+          res
+            .status(500)
+            .json({ message: "Error al insertar datos en tabla intermedia" });
+        } else {
+          res.status(201).json({ message: "Ejercicio creado exitosamente" });
+        }
       }
     }
-  );
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
 });
 
 //Editar ejercicio
@@ -74,28 +87,39 @@ router.put("/ejercicios/:id_ejercicio", async (req, res) => {
     const id = req.params.id_ejercicio;
     const { nombre_ejercicio, series, repeticiones, id_cliente } = req.body;
 
-    // Actualizamos los datos del ejercicio
-    const { rows: ejerciciosRows } = await pool.query(
-      "UPDATE ejercicio SET nombre_ejercicio = $1, series = $2, repeticiones = $3 WHERE id_ejercicio = $4 RETURNING *",
-      [nombre_ejercicio, series, repeticiones, id]
-    );
+    const { error: ejercicioError } = await supabase
+      .from("ejercicio")
+      .update({ nombre_ejercicio, series, repeticiones })
+      .eq("id_ejercicio", id);
 
-    if (!ejerciciosRows[0]) {
-      return res.status(404).json({ mensaje: "Ejercicio no encontrado" });
+    if (ejercicioError) {
+      console.error(ejercicioError);
+      res.status(500).json({ mensaje: "Error interno del servidor" });
+      return;
     }
 
-    // Eliminamos todas las relaciones existentes con los clientes
-    await pool.query("DELETE FROM cliente_ejercicio WHERE id_ejercicio = $1", [
-      id,
-    ]);
+    const { error: relacionError } = await supabase
+      .from("cliente_ejercicio")
+      .delete()
+      .eq("id_ejercicio", id);
 
-    // Insertamos las nuevas relaciones con los clientes
-    await pool.query(
-      "INSERT INTO cliente_ejercicio (id_cliente, id_ejercicio) VALUES ($1, $2)",
-      [id_cliente, id]
-    );
+    if (relacionError) {
+      console.error(relacionError);
+      res.status(500).json({ mensaje: "Error interno del servidor" });
+      return;
+    }
 
-    res.status(200).json(ejerciciosRows[0]);
+    const { error: nuevaRelacionError } = await supabase
+      .from("cliente_ejercicio")
+      .insert([{ id_cliente, id_ejercicio: id }]);
+
+    if (nuevaRelacionError) {
+      console.error(nuevaRelacionError);
+      res.status(500).json({ mensaje: "Error interno del servidor" });
+      return;
+    }
+
+    res.status(200).json({ mensaje: "Ejercicio actualizado correctamente" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ mensaje: "Error interno del servidor" });
@@ -109,20 +133,27 @@ router.delete(
     try {
       const id = req.params.id_ejercicio;
 
-      // Eliminamos todas las relaciones existentes con los clientes
-      await pool.query(
-        "DELETE FROM cliente_ejercicio WHERE id_ejercicio = $1",
-        [id]
-      );
+      const { error: relacionError } = await supabase
+        .from("cliente_ejercicio")
+        .delete()
+        .eq("id_ejercicio", id);
 
-      // Eliminamos el ejercicio de la base de datos
-      const { rows: ejerciciosRows } = await pool.query(
-        "DELETE FROM ejercicio WHERE id_ejercicio = $1 RETURNING *",
-        [id]
-      );
+      if (relacionError) {
+        console.error(relacionError);
+        res.status(500).json({ mensaje: "Error interno del servidor" });
+        return;
+      }
 
-      if (!ejerciciosRows[0]) {
-        return res.status(404).json({ mensaje: "Ejercicio no encontrado" });
+      const { data: ejercicioData, error: ejercicioError } = await supabase
+        .from("ejercicio")
+        .delete()
+        .eq("id_ejercicio", id)
+        .single();
+
+      if (ejercicioError) {
+        console.error(ejercicioError);
+        res.status(404).json({ mensaje: "Ejercicio no encontrado" });
+        return;
       }
 
       res.status(200).json({ mensaje: "Ejercicio eliminado correctamente" });
